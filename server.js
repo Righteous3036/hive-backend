@@ -56,10 +56,7 @@ app.get('/api/stats', auth, async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({
-    message: '🐝 Hive API is running!',
-    version: '1.0.0',
-  });
+  res.send('🐝 Hive API is running!');
 });
 
 const PORT = process.env.PORT || 5000;
