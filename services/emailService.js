@@ -1,16 +1,14 @@
-const nodemailer = require('nodemailer');
-
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: '142.250.115.108', // Direct IPv4 address for smtp.gmail.com
   port: 587,
-  secure: false, // Must be false for port 587
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
+    servername: 'smtp.gmail.com', // Required so SSL certificate validation passes
     rejectUnauthorized: false,
-    ciphers: 'SSLv3',
   },
 });
 
