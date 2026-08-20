@@ -1,17 +1,16 @@
-const dns = require('dns');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false, // Must be false for port 587
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  // Force IPv4 lookup to fix the ENETUNREACH IPv6 Render error
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
+  tls: {
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3',
   },
 });
 
