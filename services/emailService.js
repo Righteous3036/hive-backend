@@ -22,7 +22,7 @@ const sendVerificationCode = async (email, code) => {
             </p>
             <div style="background: white; border: 2px dashed #00467F; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
               <h1 style="color: #00467F; font-size: 48px; letter-spacing: 12px; margin: 0;">${code}</h1>
-              <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 5 minutes</p>
+              <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 10 minutes</p>
             </div>
             <p style="color: #888; font-size: 13px; line-height: 1.6;">
               If you did not request this code, please ignore this email.
@@ -46,5 +46,8 @@ const sendVerificationCode = async (email, code) => {
   }
 };
 
-// Only export the functions you need
-module.exports = { sendVerificationCode };
+// ✅ Export BOTH function names (for backward compatibility)
+module.exports = { 
+  sendVerificationCode,
+  sendOTP: sendVerificationCode  // ← Alias for backward compatibility
+};
