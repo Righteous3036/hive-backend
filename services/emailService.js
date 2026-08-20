@@ -1,16 +1,23 @@
+const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 global lookup to prevent Render ENETUNREACH errors
+dns.setDefaultResultOrder('ipv4first');
+
 const transporter = nodemailer.createTransport({
-  host: '142.250.115.108', // Direct IPv4 address for smtp.gmail.com
+  host: 'smtp.gmail.com',
   port: 587,
-  secure: false,
+  secure: false, // false for 587
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    servername: 'smtp.gmail.com', // Required so SSL certificate validation passes
     rejectUnauthorized: false,
   },
 });
+
+module.exports = transporter; // or export whatever functions you have
 
 const sendOTP = async (email, otp, name) => {
   const mailOptions = {
