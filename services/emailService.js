@@ -2,22 +2,33 @@
 const sgMail = require('@sendgrid/mail');
 
 const sendVerificationCode = async (email, code) => {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  
-  const msg = {
-    to: email,
-    from: process.env.SENDER_EMAIL,
-    subject: 'Your Verification Code',
-    html: `
-      <h3>Email Verification</h3>
-      <p>Your verification code is:</p>
-      <h1 style="font-size: 32px; color: #4F46E5;">${code}</h1>
-      <p>This code will expire in 5 minutes.</p>
-    `
-  };
-  
-  await sgMail.send(msg);
+  try {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    
+    const msg = {
+      to: email,
+      from: process.env.SENDER_EMAIL || 'bidahoredem@gmail.com',
+      subject: 'Your Verification Code',
+      html: `
+        <h3>Email Verification</h3>
+        <p>Your verification code is:</p>
+        <h1 style="font-size: 32px; color: #4F46E5;">${code}</h1>
+        <p>This code will expire in 5 minutes.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      `
+    };
+    
+    await sgMail.send(msg);
+    console.log('✅ Verification email sent to:', email);
+    return { success: true };
+    
+  } catch (error) {
+    console.error('❌ SendGrid error:', error.response?.body || error.message);
+    throw new Error('Failed to send verification code');
+  }
 };
+
+module.exports = { sendVerificationCode };
 
 module.exports = transporter; // or export whatever functions you have
 
