@@ -1,20 +1,15 @@
 const nodemailer = require('nodemailer');
-const dns = require('dns');
-
-// Force IPv4 global lookup to prevent Render ENETUNREACH errors
-dns.setDefaultResultOrder('ipv4first');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // false for 587
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
+  // ✅ Force IPv4
+  family: 4
 });
 
 module.exports = transporter; // or export whatever functions you have
