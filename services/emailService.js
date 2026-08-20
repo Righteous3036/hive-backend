@@ -1,21 +1,23 @@
-const nodemailer = require('nodemailer');
-const dns = require('dns');
+// services/emailService.js
+const sgMail = require('@sendgrid/mail');
 
-// Force IPv4 global lookup to prevent Render ENETUNREACH errors
-dns.setDefaultResultOrder('ipv4first');
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // false for 587
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+const sendVerificationCode = async (email, code) => {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  
+  const msg = {
+    to: email,
+    from: process.env.SENDER_EMAIL,
+    subject: 'Your Verification Code',
+    html: `
+      <h3>Email Verification</h3>
+      <p>Your verification code is:</p>
+      <h1 style="font-size: 32px; color: #4F46E5;">${code}</h1>
+      <p>This code will expire in 5 minutes.</p>
+    `
+  };
+  
+  await sgMail.send(msg);
+};
 
 module.exports = transporter; // or export whatever functions you have
 
