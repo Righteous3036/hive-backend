@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { sendOTP } = require('../services/emailService');
+const { sendVerificationCode } = require('../services/emailService');
 
 // Generate 6-digit OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -73,7 +73,7 @@ router.post('/send-otp', async (req, res) => {
     );
 
     // Send OTP email
-    await sendOTP(email, otp, name);
+    await sendVerificationCode(email, otp);
 
     res.json({
       success: true,
