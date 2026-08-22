@@ -168,8 +168,13 @@ router.post('/register', async (req, res) => {
       message: 'Account created successfully!',
       token,
       user: {
-        id: userId, name, email,
-        student_id, department, level, role: 'student',
+        id: userId,
+        name,
+        email,
+        student_id,
+        department,
+        level,
+        role: 'student',
       },
     });
   } catch (error) {
@@ -221,15 +226,179 @@ router.post('/login', async (req, res) => {
       message: 'Login successful!',
       token,
       user: {
-        id: user.id, name: user.name, email: user.email,
-        student_id: user.student_id, department: user.department,
-        level: user.level, role: user.role,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        student_id: user.student_id,
+        department: user.department,
+        level: user.level,
+        role: user.role,
         profile_color: user.profile_color || '#00467F',
       },
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
+// ── FORGOT PASSWORD — SEND OTP ──
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+      });
+    }
+
+    // Check if user exists
+    const result = await db.query(
+      'SELECT id, name FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email address',
+      });
+    }
+
+    // Delete existing OTPs for this email
+    await db.query('DELETE FROM otp_codes WHERE email = $1', [email]);
+
+    // Generate OTP
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Save OTP to database
+    await db.query(
+      'INSERT INTO otp_codes (email, otp, expires_at) VALUES ($1, $2, $3)',
+      [email, otp, expiresAt]
+    );
+
+    // Send OTP email
+    await sendVerificationCode(email, otp);
+
+    res.json({
+      success: true,
+      message: `Password reset code sent to ${email}`,
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send reset code. Please try again.',
+    });
+  }
+});
+
+// ── VERIFY RESET OTP ──
+router.post('/verify-reset-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+      });
+    }
+
+    // Check if OTP is valid
+    const result = await db.query(
+      `SELECT * FROM otp_codes
+       WHERE email = $1 AND otp = $2
+       AND expires_at > NOW() AND used = FALSE`,
+      [email, otp]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Code verified successfully',
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+});
+
+// ── RESET PASSWORD ──
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address',
+      });
+    }
+
+    // Validate password (minimum 6 characters)
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
+    }
+
+    // Verify OTP is valid and not used
+    const otpResult = await db.query(
+      `SELECT * FROM otp_codes
+       WHERE email = $1 AND otp = $2
+       AND expires_at > NOW() AND used = FALSE`,
+      [email, otp]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired code. Please start again.',
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user's password
+    await db.query(
+      'UPDATE users SET password = $1 WHERE email = $2',
+      [hashedPassword, email]
+    );
+
+    // Mark OTP as used
+    await db.query(
+      'UPDATE otp_codes SET used = TRUE WHERE email = $1',
+      [email]
+    );
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully! You can now login with your new password.',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
   }
 });
 
