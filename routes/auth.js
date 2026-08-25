@@ -1,3 +1,8 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../config/database');
+const bcrypt = require('bcrypt');
+
 // ── FORGOT PASSWORD — SEND OTP ──
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -15,7 +20,6 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Delete existing OTPs
     await db.query('DELETE FROM otp_codes WHERE email = $1', [email]);
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -98,3 +102,5 @@ router.post('/reset-password', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+module.exports = router;
