@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
-const db = require('../config/db');  // ← CORRECTED PATH
+const bcrypt = require('bcryptjs'); // ← Switched to bcryptjs for Render compatibility
+const db = require('../config/db');
 
 // ── FORGOT PASSWORD — SEND OTP ──
 router.post('/forgot-password', async (req, res) => {
