@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
 const bcrypt = require('bcrypt');
+const db = require('../config/db');  // ← CORRECTED PATH
 
 // ── FORGOT PASSWORD — SEND OTP ──
 router.post('/forgot-password', async (req, res) => {
