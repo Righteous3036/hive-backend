@@ -1,7 +1,47 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs'); // ← Switched to bcryptjs for Render compatibility
+const bcrypt = require('bcryptjs');
 const db = require('../config/db');
+
+// ── LOGIN ROUTE ──
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const result = await db.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    // Return user details (exclude password hash)
+    const { password: _, ...userData } = user;
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: userData,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Server error during login' });
+  }
+});
 
 // ── FORGOT PASSWORD — SEND OTP ──
 router.post('/forgot-password', async (req, res) => {
