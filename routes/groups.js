@@ -100,7 +100,8 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const result = await db.query(
       `SELECT g.*, u.name as creator_name,
-       COUNT(DISTINCT CASE WHEN gm.status = 'approved' THEN gm.id END) as member_count
+       COUNT(DISTINCT CASE WHEN gm.status = 'approved' 
+       THEN gm.id END)::int as member_count
        FROM groups_table g
        LEFT JOIN users u ON g.created_by = u.id
        LEFT JOIN group_members gm ON g.id = gm.group_id
@@ -110,12 +111,16 @@ router.get('/:id', auth, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Group not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+      });
     }
 
     const group = result.rows[0];
     const tags = await db.query(
-      'SELECT tag FROM group_tags WHERE group_id = $1', [group.id]
+      'SELECT tag FROM group_tags WHERE group_id = $1',
+      [group.id]
     );
     group.tags = tags.rows.map(t => t.tag);
 
@@ -678,6 +683,131 @@ router.get('/:id/messages/unread-count', auth, async (req, res) => {
   } catch (error) {
     console.error('Unread count error:', error);
     res.status(500).json({ success: false, count: 0 });
+  }
+});
+
+// ── AI GROUP MATCHING ──
+router.post('/ai-match', auth, async (req, res) => {
+  try {
+    const { answers } = req.body;
+    const userId = req.user.id;
+
+    // Get user info
+    const userRes = await db.query(
+      'SELECT name, department, level FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userRes.rows[0];
+
+    // Get all active groups
+    const groupsRes = await db.query(
+      `SELECT g.id, g.name, g.description, g.category, g.color,
+       g.location, g.meeting_time, g.meeting_frequency,
+       COUNT(DISTINCT gm.id) as member_count
+       FROM groups_table g
+       LEFT JOIN group_members gm ON g.id = gm.group_id
+       AND gm.status = 'approved'
+       WHERE g.status = 'active'
+       GROUP BY g.id
+       ORDER BY g.created_at DESC`
+    );
+
+    const groups = groupsRes.rows;
+
+    // Get tags for each group
+    for (let group of groups) {
+      const tags = await db.query(
+        'SELECT tag FROM group_tags WHERE group_id = $1',
+        [group.id]
+      );
+      group.tags = tags.rows.map(t => t.tag);
+    }
+
+    const groupList = groups.map(g =>
+      `ID: ${g.id} | Name: ${g.name} | Category: ${g.category} | Description: ${g.description} | Tags: ${g.tags.join(', ')} | Members: ${g.member_count}`
+    ).join('\n');
+
+    const prompt = `You are an intelligent campus group matching assistant for the University of Ghana's Hive app.
+
+A student just registered with this profile:
+- Name: ${user.name}
+- Department: ${user.department}
+- Level: ${user.level}
+
+They answered these interest questions:
+Q1 - Academic interest: ${answers[0]}
+Q2 - Activities they enjoy: ${answers[1]}
+Q3 - When they are free: ${answers[2]}
+Q4 - University goals: ${answers[3]}
+Q5 - Preferred group environment: ${answers[4]}
+
+Here are all available campus groups:
+${groupList}
+
+Based on the student's interests, department, level and answers, recommend the TOP 3 most suitable groups.
+
+Consider:
+- Match their academic interests with study groups
+- Match their hobbies and activities with relevant groups  
+- Consider their availability and preferred group size
+- Consider their university goals
+
+Respond ONLY with a valid JSON array, no explanation, no markdown:
+[
+  {
+    "group_id": <number>,
+    "match_percentage": <number between 75 and 99>,
+    "reason": "<one clear sentence explaining why this group is perfect for this student>"
+  },
+  {
+    "group_id": <number>,
+    "match_percentage": <number between 70 and 95>,
+    "reason": "<one clear sentence>"
+  },
+  {
+    "group_id": <number>,
+    "match_percentage": <number between 65 and 90>,
+    "reason": "<one clear sentence>"
+  }
+]`;
+
+    // Call Claude AI
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const aiData = await response.json();
+    console.log('AI response status:', response.status);
+
+    const rawText = aiData.content?.[0]?.text || '[]';
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+    const recommendations = JSON.parse(cleaned);
+
+    // Match recommendations with group data
+    const matchedGroups = recommendations.map(rec => {
+      const group = groups.find(g => Number(g.id) === Number(rec.group_id));
+      if (!group) return null;
+      return {
+        ...group,
+        match_percentage: rec.match_percentage,
+        reason: rec.reason,
+      };
+    }).filter(Boolean);
+
+    res.json({ success: true, matches: matchedGroups });
+  } catch (error) {
+    console.error('AI matching error:', error);
+    res.status(500).json({ success: false, message: 'AI matching failed', error: error.message });
   }
 });
 

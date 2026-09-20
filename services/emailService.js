@@ -1,10 +1,9 @@
-// services/emailService.js
 const sgMail = require('@sendgrid/mail');
 
-const sendVerificationCode = async (email, code) => {
+const sendVerificationCode = async (email, code, name = 'Student') => {
   try {
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    
+
     const msg = {
       to: email,
       from: process.env.SENDER_EMAIL || 'bidahoredem@gmail.com',
@@ -18,6 +17,7 @@ const sendVerificationCode = async (email, code) => {
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 12px 12px;">
             <h2 style="color: #1a1a2e; margin-top: 0;">Email Verification</h2>
             <p style="color: #555; line-height: 1.6;">
+              Hello <strong>${name}</strong>,<br>
               Your verification code is:
             </p>
             <div style="background: white; border: 2px dashed #00467F; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
@@ -35,19 +35,18 @@ const sendVerificationCode = async (email, code) => {
         </div>
       `
     };
-    
+
     await sgMail.send(msg);
     console.log('✅ Verification email sent to:', email);
     return { success: true };
-    
+
   } catch (error) {
     console.error('❌ SendGrid error:', error.response?.body || error.message);
     throw new Error('Failed to send verification code');
   }
 };
 
-// ✅ Export BOTH function names (for backward compatibility)
-module.exports = { 
+module.exports = {
   sendVerificationCode,
-  sendOTP: sendVerificationCode  // ← Alias for backward compatibility
+  sendOTP: sendVerificationCode
 };
