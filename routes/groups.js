@@ -56,18 +56,21 @@ router.post('/', auth, async (req, res) => {
       name, description, category, icon, color,
       location, meeting_time, meeting_frequency,
       max_members, is_private, require_approval, tags,
+      cover_image, profile_image,
     } = req.body;
 
     const result = await db.query(
       `INSERT INTO groups_table
        (name, description, category, icon, color, location,
         meeting_time, meeting_frequency, max_members,
-        is_private, require_approval, created_by, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending')
+        is_private, require_approval, created_by, status,
+        cover_image, profile_image)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14)
        RETURNING id`,
       [name, description, category, icon, color, location,
        meeting_time, meeting_frequency, max_members,
-       is_private, require_approval, req.user.id]
+       is_private, require_approval, req.user.id,
+       cover_image || null, profile_image || null]
     );
 
     const groupId = result.rows[0].id;
@@ -495,6 +498,116 @@ router.put('/:id/status', auth, async (req, res) => {
     res.json({ success: true, message: `Group ${status}` });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── UPDATE GROUP (creator or admin) ──
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const userId = req.user.id;
+
+    const groupResult = await db.query(
+      'SELECT created_by FROM groups_table WHERE id = $1',
+      [groupId]
+    );
+
+    if (groupResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    const isCreator = Number(groupResult.rows[0].created_by) === Number(userId);
+
+    const adminCheck = await db.query(
+      `SELECT role FROM group_members
+       WHERE group_id = $1 AND user_id = $2 AND status = 'approved'`,
+      [groupId, userId]
+    );
+    const isAdmin = adminCheck.rows[0]?.role === 'admin';
+
+    if (!isCreator && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only admins or the creator can edit group details' });
+    }
+
+    const {
+      name,
+      description,
+      location,
+      meeting_time,
+      meeting_frequency,
+      max_members,
+      category,
+      is_private,
+      require_approval,
+      cover_image,
+      profile_image,
+    } = req.body;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${idx++}`);
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(description);
+    }
+    if (location !== undefined) {
+      updates.push(`location = $${idx++}`);
+      values.push(location);
+    }
+    if (meeting_time !== undefined) {
+      updates.push(`meeting_time = $${idx++}`);
+      values.push(meeting_time);
+    }
+    if (meeting_frequency !== undefined) {
+      updates.push(`meeting_frequency = $${idx++}`);
+      values.push(meeting_frequency);
+    }
+    if (max_members !== undefined) {
+      updates.push(`max_members = $${idx++}`);
+      values.push(max_members);
+    }
+    if (category !== undefined) {
+      updates.push(`category = $${idx++}`);
+      values.push(category);
+    }
+    if (is_private !== undefined) {
+      updates.push(`is_private = $${idx++}`);
+      values.push(is_private);
+    }
+    if (require_approval !== undefined) {
+      updates.push(`require_approval = $${idx++}`);
+      values.push(require_approval);
+    }
+    if (cover_image !== undefined) {
+      updates.push(`cover_image = $${idx++}`);
+      values.push(cover_image);
+    }
+    if (profile_image !== undefined) {
+      updates.push(`profile_image = $${idx++}`);
+      values.push(profile_image);
+    }
+
+    if (updates.length === 0) {
+      return res.json({ success: true, message: 'No fields to update' });
+    }
+
+    values.push(groupId);
+    const query = `UPDATE groups_table SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+    const updatedRes = await db.query(query, values);
+
+    res.json({
+      success: true,
+      message: 'Group updated successfully',
+      group: updatedRes.rows[0],
+    });
+  } catch (error) {
+    console.error('Update group error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
