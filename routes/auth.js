@@ -56,7 +56,7 @@ router.post('/send-otp', async (req, res) => {
 // ── REGISTER USER ──
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, studentId, department, level, otp } = req.body;
+    const { email, password, name, student_id, department, level, otp } = req.body;
 
     const otpResult = await db.query(
       `SELECT * FROM otp_codes
@@ -77,7 +77,7 @@ router.post('/register', async (req, res) => {
       `INSERT INTO users (email, password, name, student_id, department, level, role)
        VALUES ($1, $2, $3, $4, $5, $6, 'student')
        RETURNING id, email, name, student_id, department, level, role`,
-      [email, hashedPassword, name, studentId, department, level]
+      [email, hashedPassword, name, student_id, department, level]
     );
 
     await db.query('UPDATE otp_codes SET used = TRUE WHERE email = $1', [email]);
